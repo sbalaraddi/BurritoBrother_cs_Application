@@ -84,9 +84,17 @@ public class BurritoCustomer
     {
         try
         {
-            Console.WriteLine($"The Customer : {myCustomerId} is being Registered \n");
+            if (CustomerHandlingRegistry.IsThereRoomForCustomerToWait() == true)
+            {
+                Console.WriteLine($"The Customer : {myCustomerId} is being Registered \n");
 
-            myCurOrder = CustomerHandlingRegistry.RegisterCustomer(this);
+                myCurOrder = CustomerHandlingRegistry.RegisterCustomer(this);
+            }
+            else
+            {
+                Console.WriteLine(
+                    $"THE RESTAURANT IS FULL!\n\tThe Customer: {this.GetCustId()} will not be serviced\n\tThe Customer will not be entered in the Waiting Area\n\tSorry for the inconvenience caused!\n");
+            }
         }
         catch (Exception e1)
         {

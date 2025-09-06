@@ -10,6 +10,18 @@ public static class CustomerHandlingRegistry
     private static readonly List<BurritoCustomer> RegisteredBurritoCustomerTwoBurrito = new List<BurritoCustomer>();
     private static readonly List<BurritoCustomer> RegisteredBurritoCustomerThreeBurrito = new List<BurritoCustomer>();
 
+    public static bool IsThereRoomForCustomerToWait()
+    {
+        if ((RegisteredBurritoCustomerOneBurrito.Count +
+            RegisteredBurritoCustomerTwoBurrito.Count +
+            RegisteredBurritoCustomerThreeBurrito.Count) > 14)
+            {
+                return false;
+            }
+        
+        return true;
+    }
+
     public static int RegisterCustomer(BurritoCustomer newCustomer)
     {
         available.Wait();
@@ -17,13 +29,7 @@ public static class CustomerHandlingRegistry
         {
             int orderToService = newCustomer.CustomerToBeServiced();
 
-            if ((RegisteredBurritoCustomerOneBurrito.Count +
-                 RegisteredBurritoCustomerTwoBurrito.Count +
-                 RegisteredBurritoCustomerThreeBurrito.Count) > 14)
-            {
-                orderToService = 0;
-            }
-
+     
             //This will ensure each customer will be served the max of 3 burritos order at a time(Round Robin)
             if (orderToService > 0)
             {
