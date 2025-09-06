@@ -1,53 +1,54 @@
 using System;
-using System.Threading;
+using System.Threading.Tasks;
 
 public class BurritoServer
 {
-    private readonly int myServerId;
-    private readonly string myServerName;
+    private readonly int serverId;
+    private readonly string serverName;
 
     private const int TimeforServer1 = 2000;  // Delay of 2000 milliseconds
     private const int TimeforServer2 = 4000;  // Delay of 4000 milliseconds
     private const int TimeforServer3 = 6000;  // Delay of 6000 milliseconds
 
-    private Thread thread;
-
-    public BurritoServer(int id, string serverName)
+    public BurritoServer(int id, string server)
     {
-        myServerId = id;
-        myServerName = serverName;
-        Console.WriteLine(myServerName);
-
-        // Each server runs on its own thread
-        thread = new Thread(Run);
+        serverId = id;
+        serverName = server;
+        Console.WriteLine(serverName);
     }
 
-    public void Start()
+    public Task StartAsync()
     {
-        thread.Start();
+        // Run the server loop asynchronously
+        return Task.Run(() => RunAsync());
     }
 
-    private void Run()
+    private async Task RunAsync()
     {
         try
         {
             // The Burrito Server will never stop servicing as long as there are customers
             while (true)
             {
-                // Burrito Server thread waits before servicing customers
-                Thread.Sleep(1000);
+                // Burrito Server waits before checking for customers
+                await Task.Delay(1000);
 
-                BurritoCustomer currentCustomer = CustomerHandlingRegistry.GetNextRegisteredCustomer();
+                var currentCustomer = await CustomerHandlingRegistry.GetNextRegisteredCustomerAsync();
 
                 if (currentCustomer != null)
                 {
-                    int currentOrder = currentCustomer.GetCurrentOrder();
-                    Console.WriteLine(
-                        $"Server ID: \"{myServerName}\" servicing customer, " +
-                        $"Customer ID: \"{currentCustomer.GetCustId()}\" of order {currentOrder} burritos\n");
+                    var currentOrder = currentCustomer.GetCurrentOrder();
 
-                    int delay = 1000;
-                    switch (myServerId)
+                    currentCustomer.servingServerName = serverName;
+
+                    Console.WriteLine(
+                        $"Server: \"{serverName}\" servicing Customer: \"{currentCustomer.GetCustId()}\" " +
+                        $"with order of {currentOrder} burrito(s)\n");
+
+                    Logging.LogMatrices("Customer:  " + currentCustomer.GetCustId() + "| " + "Served by : " + serverName);
+
+                    int delay;
+                    switch (serverId)
                     {
                         case 1:
                             delay = TimeforServer1;
@@ -58,16 +59,22 @@ public class BurritoServer
                         case 3:
                             delay = TimeforServer3;
                             break;
+                        default:
+                            delay = 1000;
+                            break;
                     }
 
                     // Assuming serving time = delay * number of burritos
-                    Thread.Sleep(currentOrder * delay);
+                    await Task.Delay(currentOrder * delay);
 
                     Console.WriteLine(
-                        $"Server ID: \"{myServerName}\" ---> Customer ID: \"{currentCustomer.GetCustId()}\". " +
-                        $"Time Spent in servicing the customer : {currentOrder * delay} milliseconds\n");
+                        $"Server: \"{serverName}\" ---> Customer: \"{currentCustomer.GetCustId()}\". " +
+                        $"Time spent servicing: {currentOrder * delay} milliseconds\n");
 
-                    currentCustomer.UpdateBurritoCustomerOrder(currentCustomer.GetCurrentOrder());
+                    Logging.LogMatrices("Customer:  " + currentCustomer.GetCustId() + "| " + "Served by : " + serverName + $"| Time Spent : { currentOrder* delay} msec");
+
+                    // Update customer order asynchronously
+                    await currentCustomer.UpdateBurritoCustomerOrderAsync(currentOrder);
                 }
             }
         }

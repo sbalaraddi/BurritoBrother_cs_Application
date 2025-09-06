@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 
 public static class CustomerHandlingRegistry
 {
-    private static SemaphoreSlim available = new SemaphoreSlim(1, 1);
+    private static readonly SemaphoreSlim available = new SemaphoreSlim(1, 1);
 
     private static readonly List<BurritoCustomer> RegisteredBurritoCustomerOneBurrito = new List<BurritoCustomer>();
     private static readonly List<BurritoCustomer> RegisteredBurritoCustomerTwoBurrito = new List<BurritoCustomer>();
@@ -12,46 +13,41 @@ public static class CustomerHandlingRegistry
 
     public static bool IsThereRoomForCustomerToWait()
     {
-        if ((RegisteredBurritoCustomerOneBurrito.Count +
-            RegisteredBurritoCustomerTwoBurrito.Count +
-            RegisteredBurritoCustomerThreeBurrito.Count) > 14)
-            {
-                return false;
-            }
-        
-        return true;
+        int totalCustomersWaiting = RegisteredBurritoCustomerOneBurrito.Count +
+                RegisteredBurritoCustomerTwoBurrito.Count +
+                RegisteredBurritoCustomerThreeBurrito.Count;
+
+        return (totalCustomersWaiting <= 14);
     }
 
-    public static int RegisterCustomer(BurritoCustomer newCustomer)
+    public static async Task<int> RegisterCustomerAsync(BurritoCustomer newCustomer)
     {
-        available.Wait();
+        await available.WaitAsync();
         try
         {
             int orderToService = newCustomer.CustomerToBeServiced();
 
-     
-            //This will ensure each customer will be served the max of 3 burritos order at a time(Round Robin)
             if (orderToService > 0)
             {
-                if (orderToService == 1)
+                switch (orderToService)
                 {
-                    RegisteredBurritoCustomerOneBurrito.Add(newCustomer);
-                }
-                else if (orderToService == 2)
-                {
-                    RegisteredBurritoCustomerTwoBurrito.Add(newCustomer);
-                }
-                else
-                {
-                    orderToService = 3;
-                    RegisteredBurritoCustomerThreeBurrito.Add(newCustomer);
+                    case 1:
+                        RegisteredBurritoCustomerOneBurrito.Add(newCustomer);
+                        break;
+                    case 2:
+                        RegisteredBurritoCustomerTwoBurrito.Add(newCustomer);
+                        break;
+                    default:
+                        orderToService = 3;
+                        RegisteredBurritoCustomerThreeBurrito.Add(newCustomer);
+                        break;
                 }
             }
-            else
-            {
-                Console.WriteLine(
-                    $"THE RESTAURANT IS FULL!\n\tThe Customer: {newCustomer.GetCustId()} will not be serviced\n\tSorry for the inconvenience caused!\n");
-            }
+            //else
+            //{
+            //    Console.WriteLine(
+            //        $"THE RESTAURANT IS FULL!\n\tThe Customer: {newCustomer.GetCustId()} will not be serviced\n\tSorry for the inconvenience caused!\n");
+            //}
 
             return orderToService;
         }
@@ -61,9 +57,9 @@ public static class CustomerHandlingRegistry
         }
     }
 
-    public static BurritoCustomer GetNextRegisteredCustomer()
+    public static async Task<BurritoCustomer> GetNextRegisteredCustomerAsync()
     {
-        available.Wait();
+        await available.WaitAsync();
         try
         {
             BurritoCustomer customerToService = null;

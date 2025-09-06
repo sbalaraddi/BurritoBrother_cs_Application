@@ -1,73 +1,76 @@
 using System;
-using System.Threading;
+using System.Collections.Generic;
+using System.Runtime.Remoting.Metadata.W3cXsd2001;
+using System.Threading.Tasks;
 
 public class BurritoCustomer
 {
-    private readonly string myCustomerId;
-    private bool myCustomerServiceComplete = false;
-    private int myToBeServiced, myCurOrder;
-    private int myOrder;
-    private long startTime;
-    private long endTime;
-    private long waitTime;
+    private readonly string customerId;
+    private readonly string customerName;
+    //private string servingServerName;
+    private int toBeServiced, curOrder;
+    private int order;
+    private readonly List<string> serversServedBy = new List<string>();
+    public DateTime StartTime { get; private set; }
+    public DateTime StopTime { get; private set; }
 
-    private Thread thread;
+    public string servingServerName { get; set; }
+
 
     public BurritoCustomer(string id)
     {
-        myCustomerId = id;
-        Console.WriteLine(myCustomerId);
-
-        // Each customer runs on its own thread"
-        thread = new Thread(Run);
+        customerId = id;
+        customerName = "CustomerName" + id;
+        StartTime = DateTime.Now;
+        Console.WriteLine("Customer Name:  " + customerName + "\t\t" + "Customer ID:  " + customerId + " - Created");        
     }
 
     public void SetOrder(int orderNum)
     {
-        myOrder = orderNum;
-        myToBeServiced = myOrder;
+        order = orderNum;
+        toBeServiced = order;
     }
+    public int GetCurrentOrder() => curOrder;
 
-    public int GetCurrentOrder()
-    {
-        return myCurOrder;
-    }
+    public string GetCustId() => customerId;
 
-    public string GetCustId()
-    {
-        return myCustomerId;
-    }
-
-    public void UpdateBurritoCustomerOrder(int orderCount)
+    public async Task UpdateBurritoCustomerOrderAsync(int orderCount)
     {
         try
         {
-            myToBeServiced -= orderCount;
+            serversServedBy.Add(servingServerName);
 
-            Console.WriteLine($"Customer : {myCustomerId} is Serviced {orderCount} Burritos \n");
-            myCurOrder = 0;
+            toBeServiced -= orderCount;
 
-            if (myToBeServiced > 0)
+            Console.WriteLine($"Customer : {customerId} is serviced {orderCount} burrito(s)\n");
+            Logging.LogMatrices($"Customer: {customerId} is serviced {orderCount} burrito(s)  Server:" + servingServerName);
+
+            curOrder = 0;
+
+            if (toBeServiced > 0)
             {
-                myCurOrder = CustomerHandlingRegistry.RegisterCustomer(this);
+                curOrder = await CustomerHandlingRegistry.RegisterCustomerAsync(this);
 
-                if (myCurOrder > 1)
+                if (curOrder > 1)
                 {
-                    Console.WriteLine($"Customer : {myCustomerId} is waiting in the WAITING AREA to be serviced.\n");
+                    Console.WriteLine($"Customer : {customerId} is waiting in the WAITING AREA to be serviced.\n");
+                    Logging.LogMatrices($"Customer: {customerId}  in WAITING AREA");
                 }
             }
             else
             {
-                Console.WriteLine($"Customer : {myCustomerId} is paying the server for the {myOrder} burritos \n");
+                Console.WriteLine($"Customer : {customerId} is paying the server for the {order} burrito(s)\n");
+                Logging.LogMatrices($"Customer: {customerId} is PAYING for the Server");
 
-                Thread.Sleep(1000);
+                await Task.Delay(1000);
 
-                Console.WriteLine($"Customer : {myCustomerId} is leaving the Restaurant after being serviced with {myOrder} burritos \n");
+                Console.WriteLine($"Customer : {customerId} is leaving the Restaurant after being serviced with {order} burrito(s)\n");
+                Logging.LogMatrices($"Customer: {customerId} Service Complete - LEAVING RESTURANT");
 
                 CustomerServiceComplete();
             }
 
-            Thread.Sleep(1000);
+            await Task.Delay(1000);
         }
         catch (Exception e1)
         {
@@ -75,56 +78,67 @@ public class BurritoCustomer
         }
     }
 
-    public int CustomerToBeServiced()
-    {
-        return myToBeServiced;
-    }
+    public int CustomerToBeServiced() => toBeServiced;
 
-    public void Run()
+    public async Task RunAsync()
     {
         try
         {
-            if (CustomerHandlingRegistry.IsThereRoomForCustomerToWait() == true)
-            {
-                Console.WriteLine($"The Customer : {myCustomerId} is being Registered \n");
+            Logging.LogMatrices("Customer:  " + customerId + "| " + " BurritoCount: " + order.ToString());
 
-                myCurOrder = CustomerHandlingRegistry.RegisterCustomer(this);
+            if (CustomerHandlingRegistry.IsThereRoomForCustomerToWait())
+            {
+                Console.WriteLine($"The Customer : {customerId} is being registered\n");
+                Logging.LogMatrices("Customer:  " + customerId + "| " + "Will be Served");
+
+                curOrder = await CustomerHandlingRegistry.RegisterCustomerAsync(this);
             }
             else
             {
                 Console.WriteLine(
-                    $"THE RESTAURANT IS FULL!\n\tThe Customer: {this.GetCustId()} will not be serviced\n\tThe Customer will not be entered in the Waiting Area\n\tSorry for the inconvenience caused!\n");
+                    $"THE RESTAURANT IS FULL!\n\tThe Customer: {this.GetCustId()} will not be serviced\n\t" +
+                    $"The Customer will not be entered in the Waiting Area\n\tSorry for the inconvenience caused!\n");
+
+                string logString = $"\n------------\nTHE RESTAURANT IS FULL!\n\tThe Customer: {this.GetCustId()} will not be serviced\n\t" + $"The Customer will not be entered in the Waiting Area\n\tSorry for the inconvenience caused!\n------------\n";
+                
+                Logging.LogFile(logString);
+                Logging.LogMatrices("Customer:  "  + customerId + "| " + "Not Served");
             }
         }
         catch (Exception e1)
         {
             Console.WriteLine(e1);
         }
+
+        await Task.CompletedTask;
     }
 
-    public void Start()
+    public Task StartAsync()
     {
-        thread.Start();
+        // Start customer lifecycle asynchronously
+        return Task.Run(() => RunAsync());
     }
 
     public void CustomerServiceComplete()
     {
         try
         {
-            myCustomerServiceComplete = true;
+            StopTime = DateTime.Now;
+            // Calculate elapsed time
+            TimeSpan elapsed = StopTime - StartTime;
 
-            string customer = myCustomerId;
-            string noOfBurritos = myOrder.ToString();
-            string server = "Server Name";
-            string waitingTime = "00";
-            string numberOfBatches = "1";
-            string totalTimeInRes = "123";
+            string customer = customerId;
+            string noOfBurritos = order.ToString();
+            string servers = string.Join(", ", serversServedBy);
+            string startTime = StartTime.ToString();
+            string stopTime = StopTime.ToString();
+            string numberOfBatches = serversServedBy.Count.ToString();
+            string totalTimeElapsed = elapsed.TotalSeconds.ToString() + "seconds";
 
-            string logString = customer + "    " + noOfBurritos + "    " +
-                               server + "    " + waitingTime + "    " +
-                               numberOfBatches + "    " + totalTimeInRes;
+            string logString = $"\nCustomer : {customerName}  |  Order : {noOfBurritos}  | Server : {servers} | Batches: {numberOfBatches} | StartTime : {startTime} | StopTime: {stopTime} | TotalTime: {totalTimeElapsed} \n------------\n";
 
             Logging.LogFile(logString);
+            Logging.LogMatrices(logString);
         }
         catch (Exception e)
         {
